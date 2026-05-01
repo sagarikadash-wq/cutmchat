@@ -3,128 +3,173 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
 import { addAuth } from "../redux/slices/authSlice";
-import { apiCall } from "../utils/apiHelper";
-import { checkValidSignInFrom } from "../utils/validate";
 import { PiEye, PiEyeClosedLight } from "react-icons/pi";
 
 const SignIn = () => {
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
-	const [load, setLoad] = useState("");
-	const [isShow, setIsShow] = useState(false);
+	const [formData, setFormData] = useState({
+		email: "",
+		password: "",
+	});
+	const [loading, setLoading] = useState(false);
+	const [showPassword, setShowPassword] = useState(false);
+
 	const navigate = useNavigate();
 	const dispatch = useDispatch();
-	const logInUser = async (e) => {
-		// SignIn ---
-		toast.loading("Wait until you SignIn");
-		e.target.disabled = true;
+
+	// ✅ Handle Input Change
+	const handleChange = (e) => {
+		const { name, value } = e.target;
+		setFormData((prev) => ({
+			...prev,
+			[name]: value,
+		}));
+	};
+
+	// ✅ Validate Inputs
+	const validateForm = () => {
+		const { email, password } = formData;
+
+		if (!email || !password) {
+			toast.error("All fields are required");
+			return false;
+		}
+
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		if (!emailRegex.test(email)) {
+			toast.error("Invalid email format");
+			return false;
+		}
+
+		if (password.length < 6) {
+			toast.error("Password must be at least 6 characters");
+			return false;
+		}
+
+		return true;
+	};
+
+	// ✅ API CALL (Enterprise Standard)
+	const loginUser = async () => {
+		if (!validateForm()) return;
+
+		setLoading(true);
+		const toastId = toast.loading("Signing in...");
 
 		try {
-			const json = await apiCall(`${import.meta.env.VITE_BACKEND_URL}/api/auth/signin`, {
-				method: "POST",
-				body: JSON.stringify({
-					email: email,
-					password: password,
-				}),
+			const response = await fetch(
+				`${import.meta.env.VITE_BACKEND_URL}/signin`, // ✅ FIXED URL
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify(formData),
+				}
+			);
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.message || "Login failed");
+			}
+
+			// ✅ Store Token Securely
+			if (data?.token) {
+				localStorage.setItem("token", data.token);
+			}
+
+			// ✅ Redux Update
+			if (data?.data) {
+				dispatch(addAuth(data.data));
+			}
+
+			toast.update(toastId, {
+				render: "Login successful 🎉",
+				type: "success",
+				isLoading: false,
+				autoClose: 2000,
 			});
 
-			setLoad("");
-			e.target.disabled = false;
-			toast.dismiss();
-			
-			localStorage.setItem("token", json.token);
-			dispatch(addAuth(json.data));
 			navigate("/");
-			toast.success(json?.message || "Signed in successfully");
 		} catch (error) {
-			console.error("Error:", error);
-			setLoad("");
-			toast.dismiss();
-			toast.error("Error : " + (error.message || "Network Error"));
-			e.target.disabled = false;
+			toast.update(toastId, {
+				render: error.message || "Something went wrong",
+				type: "error",
+				isLoading: false,
+				autoClose: 3000,
+			});
+		} finally {
+			setLoading(false);
 		}
 	};
-	const handleLogin = (e) => {
-		if (email && password) {
-			const validError = checkValidSignInFrom(email, password);
-			if (validError) {
-				toast.error(validError);
-				return;
-			}
-			setLoad("Loading...");
-			logInUser(e);
-		} else {
-			toast.error("Required: All Fields");
-		}
+
+	// ✅ Handle Submit
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		loginUser();
 	};
+
 	return (
 		<div className="flex flex-col items-center my-6 text-slate-300 min-h-[80vh]">
-			<div className="p-8 w-[90%] sm:w-[70%] md:w-[60%] lg:w-[45%] min-w-72 max-w-[500px] glass-effect rounded-2xl shadow-2xl mt-10 transition-premium border border-white/10">
-				<h2 className="text-3xl font-bold text-white w-full text-center mb-8 tracking-tight">
-					SignIn <span className="text-blue-500">CutmChat App</span>
+			<div className="p-8 w-[90%] sm:w-[70%] md:w-[60%] lg:w-[45%] max-w-[500px] glass-effect rounded-2xl shadow-2xl mt-10 border border-white/10">
+				
+				<h2 className="text-3xl font-bold text-white text-center mb-8">
+					Sign In <span className="text-blue-500">CutmChat</span>
 				</h2>
-				<form className="w-full flex justify-between flex-col">
-					<h3 className="text-xl font-semibold p-1">
-						Enter Email Address
-					</h3>
+
+				<form onSubmit={handleSubmit} className="flex flex-col">
+
+					<label className="font-semibold">Email Address</label>
 					<input
-						className="w-full border border-white/10 my-3 py-4 px-8 rounded-xl flex justify-between bg-white/5 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
 						type="email"
-						placeholder="Enter Email Address"
 						name="email"
-						value={email}
-						onChange={(e) => setEmail(e.target.value)}
+						value={formData.email}
+						onChange={handleChange}
+						placeholder="Enter email"
+						className="input-style"
 					/>
-					<h3 className="text-xl font-semibold p-1">
-						Enter Password
-					</h3>
+
+					<label className="font-semibold mt-4">Password</label>
 					<div className="relative">
 						<input
-							className="w-full border border-white/10 my-3 py-4 px-8 rounded-xl flex justify-between bg-white/5 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-							type={isShow ? "text" : "password"}
-							placeholder="Enter Password"
+							type={showPassword ? "text" : "password"}
 							name="password"
-							value={password}
-							onChange={(e) => setPassword(e.target.value)}
+							value={formData.password}
+							onChange={handleChange}
+							placeholder="Enter password"
+							className="input-style"
 						/>
+
 						<span
-							onClick={() => setIsShow(!isShow)}
-							className="cursor-pointer text-black/80 absolute right-5 top-8"
+							onClick={() => setShowPassword(!showPassword)}
+							className="absolute right-4 top-4 cursor-pointer text-gray-400"
 						>
-							{isShow ? (
-								<PiEyeClosedLight fontSize={22} />
+							{showPassword ? (
+								<PiEyeClosedLight size={22} />
 							) : (
-								<PiEye fontSize={22} />
+								<PiEye size={22} />
 							)}
 						</span>
 					</div>
+
 					<button
-						onClick={(e) => {
-							e.preventDefault();
-							handleLogin(e);
-						}}
-						className="disabled:opacity-50 disabled:cursor-not-allowed w-full font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-4 mt-8 text-lg shadow-lg shadow-blue-900/20 transition-premium"
+						type="submit"
+						disabled={loading}
+						className="mt-6 bg-blue-600 hover:bg-blue-700 py-3 rounded-xl font-bold disabled:opacity-50"
 					>
-						{load == "" ? "SignIn" : load}
+						{loading ? "Signing In..." : "Sign In"}
 					</button>
-					<div className="w-full flex items-center mt-3">
-						<div className="w-full h-[1px] bg-slate-600"></div>
-						<Link to="/forgot-password">
-							<div className="p-3 font-semibold text-md hover:text-white whitespace-nowrap">
-								Forgot Password
-							</div>
+
+					<div className="flex justify-between mt-4 text-sm">
+						<Link to="/forgot-password" className="hover:text-white">
+							Forgot Password?
 						</Link>
-						<div className="w-full h-[1px] bg-slate-600"></div>
-					</div>
-					<div className="w-full flex items-center my-3">
-						<div className="w-full h-[1px] bg-slate-600"></div>
-						<Link to="/signup">
-							<div className="p-3 font-semibold text-md hover:text-white">
-								SignUp
-							</div>
+
+						<Link to="/signup" className="hover:text-white">
+							Create Account
 						</Link>
-						<div className="w-full h-[1px] bg-slate-600"></div>
 					</div>
+
 				</form>
 			</div>
 		</div>
