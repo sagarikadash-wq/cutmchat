@@ -1,0 +1,31 @@
+import GroupLogo from "../assets/group.png";
+export const DEFAULT_AVATAR = "https://api.dicebear.com/7.x/avataaars/svg?seed=Avatar";
+export const BROKEN_AVATAR = "https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg";
+
+export const getValidImage = (image) => {
+	if (!image || image === BROKEN_AVATAR) {
+		return DEFAULT_AVATAR;
+	}
+	return image;
+};
+
+const getChatName = (chat, authUserId) => {
+	const chatName =
+		chat?.chatName == "Messenger"
+			? authUserId == chat.users[0]._id
+				? chat.users[1].firstName + " " + chat.users[1].lastName
+				: chat.users[0].firstName + " " + chat.users[0].lastName
+			: chat?.chatName;
+	return chatName;
+};
+export const getChatImage = (chat, authUserId) => {
+	const ImageLogo =
+		chat?.chatName == "Messenger"
+			? authUserId == chat.users[0]._id
+				? chat.users[1].image
+				: chat.users[0].image
+			: GroupLogo;
+
+	return getValidImage(ImageLogo);
+};
+export default getChatName;
